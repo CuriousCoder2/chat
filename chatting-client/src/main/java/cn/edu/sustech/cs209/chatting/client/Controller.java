@@ -4,15 +4,20 @@ import cn.edu.sustech.cs209.chatting.common.Message;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.geometry.Insets;
@@ -23,7 +28,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-
 import java.net.URL;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,22 +35,32 @@ import java.util.ResourceBundle;
 import java.util.concurrent.atomic.AtomicReference;
 
 
-import java.util.HashSet;
-import java.util.Set;
-
 
 public class Controller implements Initializable {
     @FXML
     public ListView<String> chatList;
     @FXML
     ListView<Message> chatContentList;
+    ObservableList<Message> chatContent;
 
+    HashMap<String,ListView<Message>> record=new HashMap<>();
+
+    @FXML
+    TextArea inputArea;
+
+    Socket socket;
+    PrintWriter out;
+    BufferedReader in;
+
+    boolean flag=false;
+    int transferIdentify=0;
+    List<String> userList;//从服务器获取的在线用户信息
 
     String username;
 
-
-    TabPane chatPane;
-
+    String othername;
+    @FXML
+    Label currentUsername;
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -59,12 +73,20 @@ public class Controller implements Initializable {
         Optional<String> input = dialog.showAndWait();
         if (input.isPresent() && !input.get().isEmpty()) {
             username = input.get();
+
             /*
                TODO: Check if there is a user with the same name among the currently logged-in users,
                      if so, ask the user to change the username
              */
             try {
-                if (!loginToServer()) {
+                socket=new Socket("localhost",12345);
+                out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
+                in=new BufferedReader(new InputStreamReader(socket.getInputStream(),"UTF-8"));
+                startListening();
+                out.println("LOGIN_TO_SERVER" + username);
+                out.flush();
+                Thread.currentThread().sleep(300);
+                if(!flag){
                     // 如果已经有相同的用户名登录，则要求用户重新输入用户名(设置了一个警报来解决）
                     Alert alert = new Alert(Alert.AlertType.WARNING);
                     alert.setTitle("Duplicate Username");
@@ -80,77 +102,51 @@ public class Controller implements Initializable {
                     }
                 }
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                System.out.println("服务器宕机");
+            } catch (InterruptedException e){
+
             }
         } else {
             System.out.println("Invalid username " + input + ", exiting");
             Platform.exit();
         }
-
+        chatList.setOnMouseClicked(event -> {
+           String selectedChat = chatList.getSelectionModel().getSelectedItem();
+           System.out.println(selectedChat);
+           if(selectedChat!=null) {
+               chatContentList.setItems(FXCollections.observableArrayList());
+               chatContent=chatContentList.getItems();
+               for (int q = 0; q < record.get(selectedChat).getItems().size(); q++) {
+                   chatContent.add(record.get(selectedChat).getItems().get(q));
+                System.out.println(record.get(selectedChat).getItems().get(q));
+               }
+           }
+        });
         chatContentList.setCellFactory(new MessageCellFactory());
-        try {
-            System.out.println(getUserListFromServer());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
-
-    //添加自己的名字到服务器的在线用户列表中，并且判断是否服务器在线用户列表中已经有自己的名字
-    public boolean loginToServer() throws IOException {
-        String hostName = "localhost"; // 监听的服务器主机名
-        int portNumber = 1234; // 服务器端口号
-
-        try (Socket socket = new Socket(hostName, portNumber);
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader in = new BufferedReader(
-                 new InputStreamReader(socket.getInputStream()))) {
-
-            out.println("LOGIN_TO_SERVER" + username); // 发送请求消息
-            String response = in.readLine(); // 接收响应消息
-            if (response != null && response.startsWith("LOGIN_SUCCESS")) {
-                return true;
-            } else if (response != null && response.startsWith("EXIST_USER")) {
-                return false;
-            }
-            return false;
-        }
-    }
-
-
-    //获得目前在线的所有用户
-    public List<String> getUserListFromServer() throws IOException {
-        String hostName = "localhost"; // 监听的服务器主机名
-        int portNumber = 1234; // 服务器端口号
-        List<String> userList = new ArrayList<>();
-
-        try (Socket socket = new Socket(hostName, portNumber);
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader in = new BufferedReader(
-                 new InputStreamReader(socket.getInputStream()))) {
-
-            out.println("GET_USER_LIST"); // 发送请求消息
-            String response = in.readLine(); // 接收响应消息
-            if (response != null && response.startsWith("USER_LIST:")) {
-                String[] userArray = response.substring("USER_LIST:".length()).split(",");
-                userList = Arrays.asList(userArray);
-            }
-        }
-        return userList;
-    }
 
 
     @FXML
-    public void createPrivateChat() throws IOException {
+    public void createPrivateChat() {
         AtomicReference<String> user = new AtomicReference<>();
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
+        chatContentList.setItems(FXCollections.observableArrayList());
+        chatContent=chatContentList.getItems();
+
 
         // FIXME: get the user list from server, the current user's name should be filtered out
-        List<String> userList = getUserListFromServer();
-        userList =
-            userList.stream().filter(name -> !name.equals(username)).collect(Collectors.toList());
+        try {
+            out.println("GET_USER_LIST");
+            Thread.currentThread().sleep(200);
+            System.out.println(userList);
+            userList = userList.stream().filter(name -> !name.equals(username)).collect(Collectors.toList());
+
+        }catch (Exception e){
+            System.out.println(e);
+        }
         userSel.getItems().addAll(userList);
 
 
@@ -169,113 +165,34 @@ public class Controller implements Initializable {
 
         // TODO: if the current user already chatted with the selected user, just open the chat with that user
         // TODO: otherwise, create a new chat item in the left panel, the title should be the selected user's name
-        String selectedUser = user.get();
-//        if (selectedUser != null) {
-//            // Check if the user already has a private chat with the selected user
-//            boolean alreadyExists = false;
-//            for (String item : chatList.getItems()) {
-//                if (item.equals(selectedUser)) {
-//                    alreadyExists = true;
-//                    chatList.getSelectionModel().select(item);
-//                    break;
-//                }
-//            }
-//
-//            if (!alreadyExists) {
-//                // If no chat exists with the selected user, create a new one
-////                ChatItem newItem = new ChatItem(ChatItemType.PRIVATE_CHAT, selectedUser);
-////                chatList.getItems().add(newItem);
-////                chatList.getSelectionModel().select(newItem);
-//
-//            }
-//        }
+        othername=user.get();
         // Check if there is already a chat pane with the selected user
         for (String tab : chatList.getItems()) {
-            if (tab.equals(selectedUser)) {
+            if (tab.equals(othername)) {
+                System.out.println(record.get(tab).getItems().size());
                 chatList.getSelectionModel().select(tab);
+                for(int q=0;q<record.get(tab).getItems().size();q++){
+                    chatContent.add(record.get(tab).getItems().get(q));
+                    System.out.println(record.get(tab).getItems().get(q));
+                }
                 return;
             }
         }
-        //可以删
-        if(selectedUser==null){
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Duplicate Username");
-            alert.setHeaderText(null);
-            alert.setContentText(
-                "The username has already been taken, please choose another one.");
-
-            Optional<ButtonType> result = alert.showAndWait();
-        }
 
         // Create a new chat pane if not already existing
-        String tab = selectedUser;
-        VBox chatBox = new VBox();
-        ListView<Message> chatContentList = new ListView<>();
-        chatContentList.setCellFactory(new MessageCellFactory());
-        TextField inputField = new TextField();
-        Button sendBtn = new Button("Send");
-        sendBtn.setOnAction(event -> {
-            Message message=new Message(System.currentTimeMillis(),username,selectedUser,inputField.getText());
-            if(message.getData()!=null) {
-                try {
-                    doSendMessage();//入参：selectedUser, inputField.getText()
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+        chatList.getItems().add(othername);
+        if(!record.containsKey(othername)) {
+            record.put(othername, new ListView<>());
+        }
+        else {
+            for(int q=0;q<record.get(othername).getItems().size();q++){
+                chatContent.add(record.get(othername).getItems().get(q));
+                System.out.println(record.get(othername).getItems().get(q));
             }
-
-            inputField.clear();
-        });
-        chatBox.getChildren().addAll(chatContentList, new HBox(10, inputField, sendBtn));
-//        tab.setContent(chatBox);
-        chatList.getItems().add(tab);
-        chatList.getSelectionModel().select(tab);
+        }
+        chatList.getSelectionModel().select(othername);
     }
 
-
-
-//        // 判断是否已经存在与所选用户的聊天
-//        Optional<Tab> existingTab = chatPane.getTabs().stream()
-//            .filter(tab -> Objects.equals(tab.getText(), user.get()))
-//            .findFirst();
-//
-//        if (existingTab.isPresent()) {
-//            chatPane.getSelectionModel().select(existingTab.get());
-//        } else {
-//            // 如果不存在，创建一个新的聊天窗口
-//            Tab tab = new Tab(user.get());
-//            tab.setClosable(true);
-//            TextArea chatContent = new TextArea();
-//            chatContent.setWrapText(true);
-//            chatContent.setEditable(false);
-//            VBox content = new VBox();
-//            content.getChildren().add(chatContent);
-//
-//            TextField input = new TextField();
-//            input.setOnAction(event -> {
-//                // 向服务器发送消息
-//                String message = input.getText();
-//                Message msg = new Message(System.currentTimeMillis(),username, user.get(), message);
-//                try {
-//                    Socket socket =new Socket("server address",8080);
-//                    Client client =new Client(socket);
-//                }
-//                catch (Exception e){
-//
-//                }
-//                client.sendMessage(msg);
-//                input.clear();
-//
-//                // 在聊天窗口中显示发送的消息
-//                String prevContent = chatContent.getText();
-//                chatContent.setText(prevContent + username + ": " + message + "\n");
-//            });
-//
-//            content.getChildren().add(input);
-//            tab.setContent(content);
-//            chatPane.getTabs().add(tab);
-//            chatPane.getSelectionModel().select(tab);
-//        }
 
 
 
@@ -290,14 +207,15 @@ public class Controller implements Initializable {
      * UserA, UserB (2)
      */
     @FXML
-    public void createGroupChat() throws IOException {
+    public void createGroupChat() throws IOException, InterruptedException {
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
-
+        chatContentList.setItems(FXCollections.observableArrayList());
+        chatContent=chatContentList.getItems();
         // FIXME: get the user list from server, the current user's name should be filtered out
-        List<String> userList = getUserListFromServer();
-        userList =
-            userList.stream().filter(name -> !name.equals(username)).collect(Collectors.toList());
+        out.println("GET_USER_LIST");
+        Thread.currentThread().sleep(200);
+        userList=userList.stream().filter(name -> !name.equals(username)).collect(Collectors.toList());
         userSel.getItems().addAll(userList);
         Label promptLabel = new Label("Select users to add to the group chat:");
         ListView<String> userListView = new ListView<>();
@@ -312,44 +230,29 @@ public class Controller implements Initializable {
                 Alert alert = new Alert(Alert.AlertType.ERROR, "Please select at least one user to create a group chat.");
                 alert.showAndWait();
             } else {
-                // Sort the selected users in lexicographic order
-//                selectedUsers.sort(String::compareTo);
-
                 String chatTitle;
-                if (selectedUsers.size() > 3) {
-                    chatTitle = String.join(", ", selectedUsers.subList(0, 3)) + "... (" + selectedUsers.size() + ")";
+                othername=String.join(",",selectedUsers);
+                if (selectedUsers.size() ==1) {
+                    chatTitle = selectedUsers.get(0);
                 } else {
-                    chatTitle = String.join(", ", selectedUsers) + " (" + selectedUsers.size() + ")";
+                    chatTitle = String.join(", ", selectedUsers);
                 }
+//                chatTitle=chatTitle+" (" + selectedUsers.size() + ")";
 
                 // Check if there is already a chat pane with the selected users
                 for (String tab : chatList.getItems()) {
                     if (tab.equals(chatTitle)) {
                         chatList.getSelectionModel().select(tab);
+                        for(int q=0;q<record.get(tab).getItems().size();q++){
+                            chatContent.add(record.get(tab).getItems().get(q));
+                            System.out.println(record.get(tab).getItems().get(q));
+                        }
                         stage.close();
                         return;
                     }
                 }
 
                 // Create a new chat pane if not already existing
-                VBox chatBox = new VBox();
-                ListView<Message> chatContentList = new ListView<>();
-                chatContentList.setCellFactory(new MessageCellFactory());
-                TextField inputField = new TextField();
-                Button sendBtn = new Button("Send");
-                sendBtn.setOnAction(e -> {
-                    Message message=new Message(System.currentTimeMillis(),username,chatTitle,inputField.getText());
-                    if(message.getData()!=null) {
-                        try {
-                            doSendMessage();//入参：selectedUser, inputField.getText()
-                        } catch (IOException exception) {
-                            throw new RuntimeException(exception);
-                        }
-                    }
-
-                    inputField.clear();
-                });
-                chatBox.getChildren().addAll(chatContentList, new HBox(10, inputField, sendBtn));
                 chatList.getItems().add(chatTitle);
                 chatList.getSelectionModel().select(chatTitle);
                 stage.close();
@@ -371,24 +274,76 @@ public class Controller implements Initializable {
      * After sending the message, you should clear the text input field.
      */
     @FXML
-    public void doSendMessage()throws IOException {
+    public void doSendMessage(){
 
-//        // TODO
-//        String hostName = "localhost"; // 监听的服务器主机名
-//        int portNumber = 1234; // 服务器端口号
-//        List<String> userList = new ArrayList<>();
-//
-//        try (Socket socket = new Socket(hostName, portNumber);
-//             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-//             BufferedReader in = new BufferedReader(
-//                 new InputStreamReader(socket.getInputStream()))) {
-//
-//            out.println("CHAT_MESSAGE"+message); // 发送请求消息
-//            String response = in.readLine(); // 接收响应消息
-//            if (response != null && response.startsWith("OK")) {
-//               System.out.println("succeed");
-//            }
-//        }
+        // TODO
+
+        try  {
+            String content=inputArea.getText();
+            System.out.println("content"+content);
+            if(content!=null && content.length()!=0) {
+                Message message=new Message(System.currentTimeMillis(),username,othername,content);
+                out.println("CHAT_MESSAGE:"+message.getTimestamp()+":"+message.getSentBy()+":"+message.getSendTo()+":"+message.getData()); // 发送请求消息
+                while (transferIdentify==0) {
+                }
+                inputArea.clear();
+                chatContent.add(message);
+                record.get(othername).getItems().add(message);
+                transferIdentify=0;
+            }
+        } catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public void startListening() {
+        new Thread(() -> {
+            try {
+                while (true) {
+                        String info=in.readLine();
+                        if(info!=null) {
+                            System.out.println(info);
+                            if (info.startsWith("TRANSFER_MESSAGE:")) {
+                                String received = info.substring("TRANSFER_MESSAGE:".length());
+                                String[] s = received.split(":");
+                                Long timestamp = Long.parseLong(s[0]);
+                                String sentBy = s[1];
+                                String sendTo = s[2];
+                                String data = s[3];
+                                System.out.println(data);
+                                    Message reciveMessage =
+                                        new Message(timestamp, sentBy, sendTo, data);
+                                    Platform.runLater(()->chatContent.add(reciveMessage));
+
+                            }
+                            if (info.startsWith("LOGIN_SUCCESS")) {
+                                flag=true;
+                            }
+                            if(info.startsWith("EXIST_USER")){
+
+                            }
+                            if(info.startsWith("USER_LIST:")){
+                                String[] userArray = info.substring("USER_LIST:".length()).split(",");
+                                userList = Arrays.asList(userArray);
+                                System.out.println("userList:"+userList);
+                            }
+                            if(info.startsWith("OK")){
+                                System.out.println("succeed");
+                                transferIdentify=1;
+                            }
+                        }
+                    }
+
+            } catch (IOException e) {
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("错误");
+                    alert.setHeaderText("连接错误");
+                    alert.setContentText("无法连接到服务器");
+                    alert.showAndWait();
+                });;
+            }
+        }).start();
     }
 
     /**
@@ -404,7 +359,8 @@ public class Controller implements Initializable {
                 public void updateItem(Message msg, boolean empty) {
                     super.updateItem(msg, empty);
                     if (empty || Objects.isNull(msg)) {
-                        ////////////
+                        setText(null);
+                        setGraphic(null);
                         return;
                     }
 
