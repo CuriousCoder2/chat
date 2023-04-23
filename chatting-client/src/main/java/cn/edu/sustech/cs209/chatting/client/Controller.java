@@ -73,6 +73,8 @@ public class Controller implements Initializable {
         Optional<String> input = dialog.showAndWait();
         if (input.isPresent() && !input.get().isEmpty()) {
             username = input.get();
+            currentUsername.setText("当前用户："+username);
+
 
             /*
                TODO: Check if there is a user with the same name among the currently logged-in users,
@@ -313,7 +315,11 @@ public class Controller implements Initializable {
                                 System.out.println(data);
                                     Message reciveMessage =
                                         new Message(timestamp, sentBy, sendTo, data);
-                                    Platform.runLater(()->chatContent.add(reciveMessage));
+                                    Platform.runLater(()-> {
+                                        chatContent.clear();
+                                        chatContent.add(reciveMessage);
+                                        }
+                                    );
 
                             }
                             if (info.startsWith("LOGIN_SUCCESS")) {
