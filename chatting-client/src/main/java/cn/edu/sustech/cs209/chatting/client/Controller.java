@@ -33,7 +33,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.concurrent.atomic.AtomicReference;
-
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 
 public class Controller implements Initializable {
@@ -41,9 +42,9 @@ public class Controller implements Initializable {
     public ListView<String> chatList;
     @FXML
     ListView<Message> chatContentList;
-    ObservableList<Message> chatContent;
+//    ObservableList<Message> chatContent;
 
-    HashMap<String,ListView<Message>> record=new HashMap<>();
+    HashMap<String,ObservableList<Message>> record=new HashMap<>();
 
     @FXML
     TextArea inputArea;
@@ -67,7 +68,7 @@ public class Controller implements Initializable {
 
         Dialog<String> dialog = new TextInputDialog();
         dialog.setTitle("Login");
-        dialog.setHeaderText(null);
+        dialog.setHeaderText("欢迎登陆在线聊天室");
         dialog.setContentText("Username:");
 
         Optional<String> input = dialog.showAndWait();
@@ -116,12 +117,14 @@ public class Controller implements Initializable {
            String selectedChat = chatList.getSelectionModel().getSelectedItem();
            System.out.println(selectedChat);
            if(selectedChat!=null) {
-               chatContentList.setItems(FXCollections.observableArrayList());
-               chatContent=chatContentList.getItems();
-               for (int q = 0; q < record.get(selectedChat).getItems().size(); q++) {
-                   chatContent.add(record.get(selectedChat).getItems().get(q));
-                System.out.println(record.get(selectedChat).getItems().get(q));
-               }
+               chatContentList.getItems().clear();
+               chatContentList.setItems(record.get(selectedChat));
+//               chatContentList.setItems(FXCollections.observableArrayList());
+//               chatContent=chatContentList.getItems();
+//               for (int q = 0; q < record.get(selectedChat).getItems().size(); q++) {
+//                   chatContent.add(record.get(selectedChat).getItems().get(q));
+//                System.out.println(record.get(selectedChat).getItems().get(q));
+//               }
            }
         });
         chatContentList.setCellFactory(new MessageCellFactory());
@@ -135,8 +138,8 @@ public class Controller implements Initializable {
 
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
-        chatContentList.setItems(FXCollections.observableArrayList());
-        chatContent=chatContentList.getItems();
+//        chatContentList.setItems(FXCollections.observableArrayList());
+//        chatContent=chatContentList.getItems();
 
 
         // FIXME: get the user list from server, the current user's name should be filtered out
@@ -169,30 +172,26 @@ public class Controller implements Initializable {
         // TODO: otherwise, create a new chat item in the left panel, the title should be the selected user's name
         othername=user.get();
         // Check if there is already a chat pane with the selected user
+        //如果已经与该选定用户开启了一个聊天室
         for (String tab : chatList.getItems()) {
             if (tab.equals(othername)) {
-                System.out.println(record.get(tab).getItems().size());
+                System.out.println(record.get(tab).size());
                 chatList.getSelectionModel().select(tab);
-                for(int q=0;q<record.get(tab).getItems().size();q++){
-                    chatContent.add(record.get(tab).getItems().get(q));
-                    System.out.println(record.get(tab).getItems().get(q));
-                }
+                chatContentList.setItems(record.get(tab));
+//                for(int q=0;q<record.get(tab).getItems().size();q++){
+//                    chatContent.add(record.get(tab).getItems().get(q));
+//                    System.out.println(record.get(tab).getItems().get(q));
+//                }
                 return;
             }
         }
 
         // Create a new chat pane if not already existing
+        //如果没有和这个用户开启聊天室
         chatList.getItems().add(othername);
-        if(!record.containsKey(othername)) {
-            record.put(othername, new ListView<>());
-        }
-        else {
-            for(int q=0;q<record.get(othername).getItems().size();q++){
-                chatContent.add(record.get(othername).getItems().get(q));
-                System.out.println(record.get(othername).getItems().get(q));
-            }
-        }
-        chatList.getSelectionModel().select(othername);
+        ObservableList<Message> objects=FXCollections.observableArrayList();
+        record.put(othername, objects);
+        chatList.getSelectionModel().select(othername);//选中该聊天室
     }
 
 
@@ -212,8 +211,8 @@ public class Controller implements Initializable {
     public void createGroupChat() throws IOException, InterruptedException {
         Stage stage = new Stage();
         ComboBox<String> userSel = new ComboBox<>();
-        chatContentList.setItems(FXCollections.observableArrayList());
-        chatContent=chatContentList.getItems();
+//        chatContentList.setItems(FXCollections.observableArrayList());
+//        chatContent=chatContentList.getItems();
         // FIXME: get the user list from server, the current user's name should be filtered out
         out.println("GET_USER_LIST");
         Thread.currentThread().sleep(200);
@@ -245,10 +244,7 @@ public class Controller implements Initializable {
                 for (String tab : chatList.getItems()) {
                     if (tab.equals(chatTitle)) {
                         chatList.getSelectionModel().select(tab);
-                        for(int q=0;q<record.get(tab).getItems().size();q++){
-                            chatContent.add(record.get(tab).getItems().get(q));
-                            System.out.println(record.get(tab).getItems().get(q));
-                        }
+                        chatContentList.setItems(record.get(tab));
                         stage.close();
                         return;
                     }
@@ -256,6 +252,8 @@ public class Controller implements Initializable {
 
                 // Create a new chat pane if not already existing
                 chatList.getItems().add(chatTitle);
+                ObservableList<Message> objects=FXCollections.observableArrayList();
+                record.put(othername, objects);
                 chatList.getSelectionModel().select(chatTitle);
                 stage.close();
             }
@@ -277,20 +275,19 @@ public class Controller implements Initializable {
      */
     @FXML
     public void doSendMessage(){
-
-        // TODO
-
         try  {
             String content=inputArea.getText();
             System.out.println("content"+content);
+            System.out.println("othername1: ");
+//            othername=
             if(content!=null && content.length()!=0) {
                 Message message=new Message(System.currentTimeMillis(),username,othername,content);
                 out.println("CHAT_MESSAGE:"+message.getTimestamp()+":"+message.getSentBy()+":"+message.getSendTo()+":"+message.getData()); // 发送请求消息
                 while (transferIdentify==0) {
                 }
                 inputArea.clear();
-                chatContent.add(message);
-                record.get(othername).getItems().add(message);
+                record.get(othername).add(message);//存储数据
+                chatContentList.setItems(record.get(othername));//显示消息记录
                 transferIdentify=0;
             }
         } catch (Exception e){
@@ -316,8 +313,15 @@ public class Controller implements Initializable {
                                     Message reciveMessage =
                                         new Message(timestamp, sentBy, sendTo, data);
                                     Platform.runLater(()-> {
-                                        chatContent.clear();
-                                        chatContent.add(reciveMessage);
+//                                        chatContent.clear();
+                                        if(!record.containsKey(sentBy)){
+                                            ObservableList<Message> objects=FXCollections.observableArrayList();
+                                            chatList.getItems().add(sentBy);
+                                            record.put(sentBy, objects);
+                                        }
+                                        record.get(sentBy).add(reciveMessage);
+                                        othername=sentBy;
+//                                        chatContent.add(reciveMessage);
                                         }
                                     );
 
