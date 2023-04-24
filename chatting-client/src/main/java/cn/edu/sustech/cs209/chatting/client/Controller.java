@@ -2,6 +2,9 @@ package cn.edu.sustech.cs209.chatting.client;
 
 import cn.edu.sustech.cs209.chatting.common.Message;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -355,10 +358,21 @@ public class Controller implements Initializable {
         }
     }
 
-    @FXML
-    public void doSendFile(){
-
-    }
+//    @FXML
+//    public void doSendFile() throws IOException {
+//        String fileName=inputArea.getText();
+//        inputArea.clear();
+//        System.out.println("FileName: "+fileName);
+//        out.println(fileName);
+//        File file=new File(fileName);
+//        FileInputStream fileInputStream=new FileInputStream(file);
+//        byte[] buffer = new byte[1024];
+//        int bytesRead = 0;
+//        while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+//            socket.getOutputStream().write(buffer, 0, bytesRead);
+//        }
+//        fileInputStream.close();
+//    }
 
     public void startListening() {
         new Thread(() -> {
@@ -455,8 +469,8 @@ public class Controller implements Initializable {
                 Platform.runLater(() -> {
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("错误");
-                    alert.setHeaderText("连接错误");
-                    alert.setContentText("无法连接到服务器");
+                    alert.setHeaderText("连接已断开");
+                    alert.setContentText("服务器关闭");
                     alert.showAndWait();
                 });;
             }

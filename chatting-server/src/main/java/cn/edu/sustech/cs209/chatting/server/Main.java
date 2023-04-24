@@ -1,8 +1,10 @@
 package cn.edu.sustech.cs209.chatting.server;
 
 import java.io.BufferedReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
@@ -92,14 +94,36 @@ public class Main {
                                 out.println(success);
                             }
                         } else if (request.startsWith("GET_USER_LIST")) {
-                            String userList = "USER_LIST:";
+                            StringBuilder userList = new StringBuilder("USER_LIST:");
                             for (String element : loggedInUsers.keySet()) {
-                                userList += element;
-                                userList += ",";
+                                userList.append(element);
+                                userList.append(",");
                             }
                             System.out.println("request:" + userList);
                             out.println(userList);
                         }
+//                        else if(request.startsWith("FileName:")){
+//                            // 从客户端接收文件名
+//                            String fileinfo = in.readLine();
+//                            String[]ssd=fileinfo.split(":");
+//                            String fileName=ssd[1];
+//                            String giveTo=ssd[2];//仅实现单人数据传输拉倒了
+//
+//                            // 创建输出流，以便将数据转发给下一个客户端
+//                            OutputStream outputStream = clientSocket.getOutputStream();
+//
+//                            // 将文件名转发给下一个客户端
+//                            outputStream.write(fileName.getBytes());
+//                            outputStream.write('\n');
+//
+//                            // 将文件数据转发给下一个客户端
+//                            byte[] buffer = new byte[1024];
+//                            int bytesRead = 0;
+//                            while ((bytesRead = clientSocket.getInputStream().read(buffer)) != -1) {
+//                                outputStream.write(buffer, 0, bytesRead);
+//                            }
+//
+//                        }
                     }
                 }
             } catch (IOException e) {
