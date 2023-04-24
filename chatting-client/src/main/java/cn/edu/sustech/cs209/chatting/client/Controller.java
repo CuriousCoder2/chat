@@ -115,9 +115,9 @@ public class Controller implements Initializable {
         }
         chatList.setOnMouseClicked(event -> {
            String selectedChat = chatList.getSelectionModel().getSelectedItem();
-           System.out.println("当前选中的是："+selectedChat);
            if(selectedChat!=null) {
 //               chatContentList.getItems().clear();
+               othername=selectedChat;
                chatContentList.setItems(record.get(selectedChat));
                if(!selectedChat.contains(",")) {
                    currentUsername.setText(
@@ -126,12 +126,6 @@ public class Controller implements Initializable {
                    currentUsername.setText(
                        "当前用户：" + username + ", 当前你正在 " + selectedChat + " 群聊中聊天");
                }
-//               chatContentList.setItems(FXCollections.observableArrayList());
-//               chatContent=chatContentList.getItems();
-//               for (int q = 0; q < record.get(selectedChat).getItems().size(); q++) {
-//                   chatContent.add(record.get(selectedChat).getItems().get(q));
-//                System.out.println(record.get(selectedChat).getItems().get(q));
-//               }
            }
         });
         chatContentList.setCellFactory(new MessageCellFactory());
@@ -153,7 +147,6 @@ public class Controller implements Initializable {
         try {
             out.println("GET_USER_LIST");
             Thread.currentThread().sleep(200);
-            System.out.println(userList);
             userList = userList.stream().filter(name -> !name.equals(username))
                 .collect(Collectors.toList());
 
@@ -184,13 +177,7 @@ public class Controller implements Initializable {
             //如果已经与该选定用户开启了一个聊天室
             for (String tab : chatList.getItems()) {
                 if (tab.equals(othername)) {
-//                    System.out.println(record.get(tab).size());
-//                    chatList.getSelectionModel().select(tab);
                     chatContentList.setItems(record.get(tab));
-//                for(int q=0;q<record.get(tab).getItems().size();q++){
-//                    chatContent.add(record.get(tab).getItems().get(q));
-//                    System.out.println(record.get(tab).getItems().get(q));
-//                }
                     return;
                 }
             }
@@ -258,7 +245,6 @@ public class Controller implements Initializable {
                     chatTitle = selectedUsers.get(0);
                 } else {
                     chatTitle = String.join(",", selectedUsers);
-                    System.out.println("originChatTitle:"+chatTitle);
                     String[]tmp=chatTitle.split(",");
                     String[]tmpp=new String[tmp.length+1];
                     for(int f=0;f<tmp.length;f++){
@@ -269,14 +255,11 @@ public class Controller implements Initializable {
                     chatTitle="";
                     for(int f=0;f<tmp.length;f++){
                         chatTitle+=tmpp[f]+",";
-                        System.out.println("elements:"+tmpp[f]);
                     }
                     chatTitle+=tmpp[tmp.length];
                 }
-                System.out.println("chatTitle:  "+chatTitle);
                 othername=chatTitle;
 
-//                chatTitle=chatTitle+" (" + selectedUsers.size() + ")";
 
                 // Check if there is already a chat pane with the selected users
                 for (String tab : chatList.getItems()) {
@@ -324,9 +307,15 @@ public class Controller implements Initializable {
     public void doSendMessage(){
         try  {
             String content=inputArea.getText();
-            System.out.println("content"+content);
+            content = content.replaceAll("\\n+", "\\$");
+//            content =content.replace("*","$");
+            System.out.println("content: "+content);
             if(content!=null && content.length()!=0) {
                 String othernameFinal="";
+//                if(othername==null){//如果对方没有在线
+//                    othername=chatList.getSelectionModel().getSelectedItem();
+//                    System.out.println("othername is: "+othername);
+//                }
                 if(othername.contains(",")){
                   String[]hjh=othername.split(",");
                   for(int i=0;i<hjh.length;i++){
@@ -338,18 +327,19 @@ public class Controller implements Initializable {
                 }else {
                     othernameFinal=othername;
                 }
-                System.out.println("OF:  "+othernameFinal);
                 Message message=new Message(System.currentTimeMillis(),username,othernameFinal,content);
                 out.println("CHAT_MESSAGE:"+message.getTimestamp()+":"+message.getSentBy()+":"+message.getSendTo()+":"+message.getData()); // 发送请求消息
-                while (transferIdentify==0) {
-                }
+//                while (transferIdentify==0) {
+//                }
+//                System.out.println("now a transfer happens "+othername);
                 inputArea.clear();
                 if(!record.containsKey(othername)){
                     System.out.println("othername: "+othername);
                     ObservableList<Message> objects=FXCollections.observableArrayList();
                     record.put(othername,objects);
                 }
-                record.get(othername).add(message);//存储数据
+                Message realMessage=new Message(message.getTimestamp(),message.getSentBy(),message.getSendTo(),message.getData().replace("$","\n"));
+                record.get(othername).add(realMessage);//存储数据
                 chatContentList.setItems(record.get(othername));//显示消息记录
                 transferIdentify=0;
             }
@@ -383,7 +373,7 @@ public class Controller implements Initializable {
                                 Long timestamp = Long.parseLong(s[0]);
                                 String sentBy = s[1];
                                 String sendTo = s[2];
-                                String data = s[3];
+                                String data = s[3].replace("$","\n");
                                 System.out.println(data);
                                     Message reciveMessage =
                                         new Message(timestamp, sentBy, sendTo, data);
@@ -441,21 +431,23 @@ public class Controller implements Initializable {
                                     );
 
                             }
-                            if (info.startsWith("LOGIN_SUCCESS")) {
+                            else if (info.startsWith("LOGIN_SUCCESS")) {
                                 flag=true;
                             }
-                            if(info.startsWith("EXIST_USER")){
+                            else if(info.startsWith("EXIST_USER")){
 
                             }
-                            if(info.startsWith("USER_LIST:")){
+                            else if(info.startsWith("USER_LIST:")){
                                 String[] userArray = info.substring("USER_LIST:".length()).split(",");
                                 userList = Arrays.asList(userArray);
                                 System.out.println("userList:"+userList);
                             }
-                            if(info.startsWith("OK")){
-                                System.out.println("succeed");
-                                transferIdentify=1;
-                            }
+//                            if(info.startsWith("OK")){
+//                                System.out.println("succeed");
+//                                for(int q=0;q<1000;q++) {
+//                                    transferIdentify = 1;
+//                                }
+//                            }
                         }
                     }
 

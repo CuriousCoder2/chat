@@ -60,17 +60,28 @@ public class Main {
                             String sentBy = s[1];
                             String sendTo = s[2];
                             String data = s[3];
-                            System.out.println(data);
+//                            out.println("OK");
+                            System.out.println("shunLi");
                             if (!sendTo.contains(",")) {//发给单人
-                                loggedInUsers.get(sendTo).println("TRANSFER_MESSAGE:"+timestamp+":" +sentBy+":"+sendTo+":"+ data);
+                                if(loggedInUsers.containsKey(sendTo)) {
+                                    loggedInUsers.get(sendTo).println(
+                                        "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
+                                            sendTo + ":" + data);
+                                }
+                                else {
+                                    System.out.println("notonline "+sendTo);
+                                }
                             }
                             else {
                                 String[]tmp=sendTo.split(",");
                                 for (int m=0;m<tmp.length;m++){
-                                    loggedInUsers.get(tmp[m]).println("TRANSFER_MESSAGE:"+timestamp+":" +sentBy+":"+sendTo+":"+ data);
+                                    if(loggedInUsers.containsKey(tmp[m])) {
+                                        loggedInUsers.get(tmp[m]).println(
+                                            "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
+                                                sendTo + ":" + data);
+                                    }
                                 }
                             }
-                            out.println("OK");
                         } else if (request.contains("LOGIN_TO_SERVER")) {
                             if (loggedInUsers.containsKey(request.substring(15))) {
                                 String falseAlert = "EXIST_USER";
@@ -94,6 +105,8 @@ public class Main {
             } catch (IOException e) {
                 loggedInUsers.values().removeIf(value -> value.equals(out));
                 System.out.println("Error handling client request: " + e.getMessage());
+            } catch (NullPointerException np){
+                System.out.println("The other client is offline");
             }
         }
     }
