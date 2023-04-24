@@ -22,86 +22,86 @@ import java.util.Set;
 
 public class Main {
 
-    //目前已经登录的用户名清单
-    static Map<String, PrintWriter> loggedInUsers = new HashMap<>();
+  //目前已经登录的用户名清单
+  static Map<String, PrintWriter> loggedInUsers = new HashMap<>();
 
-    public static void main(String[] args) throws IOException {
-        ServerSocket serverSocket = new ServerSocket(12345);
-        while (true) {
-            Socket clientSocket = serverSocket.accept();
-            Thread thread = new Thread(new ClientHandler(clientSocket));
-            thread.start();
-        }
-
+  public static void main(String[] args) throws IOException {
+    ServerSocket serverSocket = new ServerSocket(12345);
+    while (true) {
+      Socket clientSocket = serverSocket.accept();
+      Thread thread = new Thread(new ClientHandler(clientSocket));
+      thread.start();
     }
-    static class ClientHandler implements Runnable {
-        private final Socket clientSocket;
-        private PrintWriter out;
-        private BufferedReader in;
 
-        public ClientHandler(Socket clientSocket) {
-            this.clientSocket = clientSocket;
-        }
+  }
 
-        @Override
-        public void run() {
-            try {
-                out = new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"), true);
-                in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(),"UTF-8"));
+  static class ClientHandler implements Runnable {
+    private final Socket clientSocket;
+    private PrintWriter out;
+    private BufferedReader in;
 
-                while (true) {
-                    String request = in.readLine();
+    public ClientHandler(Socket clientSocket) {
+      this.clientSocket = clientSocket;
+    }
 
-                    if (request != null) {
-                        System.out.println(request);
-                        if (request.startsWith("CHAT_MESSAGE:")) {
-                            String message = request.substring(13);
-                            System.out.println("log: " + message);
-                            String[] s = message.split(":");
-                            Long timestamp = Long.parseLong(s[0]);
-                            String sentBy = s[1];
-                            String sendTo = s[2];
-                            String data = s[3];
+    @Override
+    public void run() {
+      try {
+        out =
+            new PrintWriter(new OutputStreamWriter(clientSocket.getOutputStream(), "UTF-8"), true);
+        in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), "UTF-8"));
+
+        while (true) {
+          String request = in.readLine();
+
+          if (request != null) {
+            System.out.println(request);
+            if (request.startsWith("CHAT_MESSAGE:")) {
+              String message = request.substring(13);
+              System.out.println("log: " + message);
+              String[] s = message.split(":");
+              Long timestamp = Long.parseLong(s[0]);
+              String sentBy = s[1];
+              String sendTo = s[2];
+              String data = s[3];
 //                            out.println("OK");
-                            System.out.println("shunLi");
-                            if (!sendTo.contains(",")) {//发给单人
-                                if(loggedInUsers.containsKey(sendTo)) {
-                                    loggedInUsers.get(sendTo).println(
-                                        "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
-                                            sendTo + ":" + data);
-                                }
-                                else {
-                                    System.out.println("notonline "+sendTo);
-                                }
-                            }
-                            else {
-                                String[]tmp=sendTo.split(",");
-                                for (int m=0;m<tmp.length;m++){
-                                    if(loggedInUsers.containsKey(tmp[m])) {
-                                        loggedInUsers.get(tmp[m]).println(
-                                            "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
-                                                sendTo + ":" + data);
-                                    }
-                                }
-                            }
-                        } else if (request.contains("LOGIN_TO_SERVER")) {
-                            if (loggedInUsers.containsKey(request.substring(15))) {
-                                String falseAlert = "EXIST_USER";
-                                out.println(falseAlert);
-                            } else {
-                                loggedInUsers.put(request.substring(15), out);
-                                String success = "LOGIN_SUCCESS";
-                                out.println(success);
-                            }
-                        } else if (request.startsWith("GET_USER_LIST")) {
-                            StringBuilder userList = new StringBuilder("USER_LIST:");
-                            for (String element : loggedInUsers.keySet()) {
-                                userList.append(element);
-                                userList.append(",");
-                            }
-                            System.out.println("request:" + userList);
-                            out.println(userList);
-                        }
+              System.out.println("shunLi");
+              if (!sendTo.contains(",")) {//发给单人
+                if (loggedInUsers.containsKey(sendTo)) {
+                  loggedInUsers.get(sendTo).println(
+                      "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
+                          sendTo + ":" + data);
+                } else {
+                  System.out.println("notonline " + sendTo);
+                }
+              } else {
+                String[] tmp = sendTo.split(",");
+                for (int m = 0; m < tmp.length; m++) {
+                  if (loggedInUsers.containsKey(tmp[m])) {
+                    loggedInUsers.get(tmp[m]).println(
+                        "TRANSFER_MESSAGE:" + timestamp + ":" + sentBy + ":" +
+                            sendTo + ":" + data);
+                  }
+                }
+              }
+            } else if (request.contains("LOGIN_TO_SERVER")) {
+              if (loggedInUsers.containsKey(request.substring(15))) {
+                String falseAlert = "EXIST_USER";
+                out.println(falseAlert);
+              } else {
+                loggedInUsers.put(request.substring(15), out);
+                String success = "LOGIN_SUCCESS";
+                out.println(success);
+              }
+            } else if (request.startsWith("GET_USER_LIST")) {
+              StringBuilder userList = new StringBuilder("USER_LIST:");
+              for (String element : loggedInUsers.keySet()) {
+                userList.append(element);
+                userList.append(",");
+              }
+              System.out.println("request:" + userList);
+              out.println(userList);
+            }
 //                        else if(request.startsWith("FileName:")){
 //                            // 从客户端接收文件名
 //                            String fileinfo = in.readLine();
@@ -124,16 +124,16 @@ public class Main {
 //                            }
 //
 //                        }
-                    }
-                }
-            } catch (IOException e) {
-                loggedInUsers.values().removeIf(value -> value.equals(out));
-                System.out.println("Error handling client request: " + e.getMessage());
-            } catch (NullPointerException np){
-                System.out.println("The other client is offline");
-            }
+          }
         }
+      } catch (IOException e) {
+        loggedInUsers.values().removeIf(value -> value.equals(out));
+        System.out.println("Error handling client request: " + e.getMessage());
+      } catch (NullPointerException np) {
+        System.out.println("The other client is offline");
+      }
     }
+  }
 
 }
 
