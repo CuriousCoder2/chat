@@ -74,7 +74,7 @@ public class Controller implements Initializable {
         Optional<String> input = dialog.showAndWait();
         if (input.isPresent() && !input.get().isEmpty()) {
             username = input.get();
-            currentUsername.setText("当前用户："+username);
+            currentUsername.setText("当前用户："+username+", 当前你尚未与他人聊天");
 
 
             /*
@@ -119,6 +119,13 @@ public class Controller implements Initializable {
            if(selectedChat!=null) {
 //               chatContentList.getItems().clear();
                chatContentList.setItems(record.get(selectedChat));
+               if(!selectedChat.contains(",")) {
+                   currentUsername.setText(
+                       "当前用户：" + username + ", 当前你正在与 " + selectedChat + " 聊天");
+               }else {
+                   currentUsername.setText(
+                       "当前用户：" + username + ", 当前你正在 " + selectedChat + " 群聊中聊天");
+               }
 //               chatContentList.setItems(FXCollections.observableArrayList());
 //               chatContent=chatContentList.getItems();
 //               for (int q = 0; q < record.get(selectedChat).getItems().size(); q++) {
@@ -178,7 +185,7 @@ public class Controller implements Initializable {
             for (String tab : chatList.getItems()) {
                 if (tab.equals(othername)) {
 //                    System.out.println(record.get(tab).size());
-                    chatList.getSelectionModel().select(tab);
+//                    chatList.getSelectionModel().select(tab);
                     chatContentList.setItems(record.get(tab));
 //                for(int q=0;q<record.get(tab).getItems().size();q++){
 //                    chatContent.add(record.get(tab).getItems().get(q));
@@ -194,6 +201,15 @@ public class Controller implements Initializable {
             ObservableList<Message> objects = FXCollections.observableArrayList();
             record.put(othername, objects);
             chatList.getSelectionModel().select(othername);//选中该聊天室
+            if(chatList.getItems().size()==1) {
+                if (!othername.contains(",")) {
+                    currentUsername.setText(
+                        "当前用户：" + username + ", 当前你正在与 " + othername + " 聊天");
+                } else {
+                    currentUsername.setText(
+                        "当前用户：" + username + ", 当前你正在 " + othername + " 群聊中聊天");
+                }
+            }
         }
     }
 
@@ -265,7 +281,7 @@ public class Controller implements Initializable {
                 // Check if there is already a chat pane with the selected users
                 for (String tab : chatList.getItems()) {
                     if (tab.equals(chatTitle)) {
-                        chatList.getSelectionModel().select(tab);
+//                        chatList.getSelectionModel().select(tab);
                         chatContentList.setItems(record.get(tab));
                         stage.close();
                         return;
@@ -277,6 +293,15 @@ public class Controller implements Initializable {
                 ObservableList<Message> objects=FXCollections.observableArrayList();
                 record.put(chatTitle, objects);
                 chatList.getSelectionModel().select(chatTitle);
+                if(chatList.getItems().size()==1) {
+                    if (!chatTitle.contains(",")) {
+                        currentUsername.setText(
+                            "当前用户：" + username + ", 当前你正在与 " + chatTitle + " 聊天");
+                    } else {
+                        currentUsername.setText(
+                            "当前用户：" + username + ", 当前你正在 " + chatTitle + " 群聊中聊天");
+                    }
+                }
                 stage.close();
             }
         });
@@ -340,6 +365,11 @@ public class Controller implements Initializable {
         }
     }
 
+    @FXML
+    public void doSendFile(){
+
+    }
+
     public void startListening() {
         new Thread(() -> {
             try {
@@ -371,18 +401,12 @@ public class Controller implements Initializable {
 //                                    String hhh="";
                                     for (int f=0;f<tmpp.length;f++){
                                         qunliao+=tmpp[f]+",";
-//                                        if(!tmpp[f].equals(username)){
-//                                            hhh+=tmpp[f]+",";
-//                                        }
+
                                     }
                                     qunliao=qunliao.substring(0,qunliao.length()-1);
-//                                    hhh=hhh.substring(0,hhh.length()-1);
-//                                    othername=hhh;
-                                }else {
+                               }else {
                                     qunliao=sentBy;
                                 }
-                                othername=qunliao;
-                                System.out.println("String:   "+qunliao);
                                 final String qunliaoo=qunliao;
 
                                     Platform.runLater(()-> {
@@ -393,6 +417,24 @@ public class Controller implements Initializable {
                                             record.put(qunliaoo, objects);
                                         }
                                         record.get(qunliaoo).add(reciveMessage);
+                                            chatList.getSelectionModel().select(othername);
+                                            chatContentList.setItems(record.get(othername));
+                                            othername=qunliaoo;
+
+                                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                                            alert.setTitle("温馨提醒");
+                                            alert.setHeaderText("新消息提醒");
+                                            System.out.println("对面叫"+qunliaoo);
+                                            if(!qunliaoo.contains(",")) {
+                                                System.out.println("yiqieshunli");
+                                                alert.setContentText(
+                                                    "用户 " + qunliaoo + " 给你发了一条新消息");
+                                            }
+                                            else {
+                                                alert.setContentText("群聊 "+qunliaoo+" 中有了新的消息");
+                                            }
+                                            alert.showAndWait();
+
 //                                        chatContentList.setItems(record.get(qunliaoo));
 
                                         }
