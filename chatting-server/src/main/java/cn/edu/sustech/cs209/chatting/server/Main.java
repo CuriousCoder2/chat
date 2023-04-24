@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Scanner;
 import java.util.Set;
 
 
@@ -91,6 +92,7 @@ public class Main {
                     }
                 }
             } catch (IOException e) {
+                loggedInUsers.values().removeIf(value -> value.equals(out));
                 System.out.println("Error handling client request: " + e.getMessage());
             }
         }
